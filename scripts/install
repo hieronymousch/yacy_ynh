@@ -1,41 +1,197 @@
-#!/bin/bash 
+## used as a reference to update this script
 
-# Retrieve arguments
-domain=$1
-path=$2
+#=================================================
+# GENERIC START
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
 
-# Check domain/path availability
-sudo yunohost app checkurl $domain$path -a yacy
-if [[ ! $? -eq 0 ]]; then
-    exit 1
-fi
+source /usr/share/yunohost/helpers
 
-# Check port availability
-sudo yunohost app checkport 8090
-if [[ ! $? -eq 0 ]]; then
-  exit 1
-fi
+#=================================================
+# MANAGE SCRIPT FAILURE
+#=================================================
+
+# Exit if an error occurs during the execution of the script
+ynh_abort_if_errors
+
+#=================================================
+# RETRIEVE ARGUMENTS FROM THE MANIFEST
+#=================================================
+
+domain=$YNH_APP_ARG_DOMAIN
+path_url=$YNH_APP_ARG_PATH
+app=$YNH_APP_INSTANCE_NAME
+
+#=================================================
+# CHECK IF THE APP CAN BE INSTALLED WITH THESE ARGS
+#=================================================
+
+final_path=/usr/share/yacy
+test ! -e "$final_path" || ynh_die "This path already contains a folder"
+
+# Normalize the url path syntax
+path_url=$(ynh_normalize_url_path $path_url)
+
+# Check web path availability
+ynh_webpath_available $domain $path_url
+# Register (book) web path
+ynh_webpath_register $app $domain $path_url
+
+#=================================================
+# STORE SETTINGS FROM MANIFEST
+#=================================================
+
+ynh_app_setting_set $app domain $domain
+ynh_app_setting_set $app path $path_url
+
+#=================================================
+# STANDARD MODIFICATIONS
+#=================================================
+# FIND AND OPEN A PORT
+#=================================================
+
+# Find a free port
+port=$(ynh_find_port 8090)
+# Open this port
+ynh_print_info "Opening port $port"
+yunohost firewall allow --no-upnp TCP $port 2>&1
+ynh_app_setting_set $app port $port
+
+#=================================================
+# DOWNLOAD, CHECK AND UNPACK SOURCE
+#=================================================
+
+#ynh_app_setting_set $app final_path $final_path
+#ynh_print_info "Downloading sources to $final_path"
+# Download, check integrity, uncompress and patch the source from app.src
+#ynh_setup_source "$final_path"
+
+#instructions from https://wiki.yacy.net/index.php/En:DebianInstall 
 
 # Install Debian official package
 echo "deb http://debian.yacy.net ./" | sudo tee /etc/apt/sources.list.d/yacy.list
-
-gpg --keyserver pgpkeys.mit.edu --recv-key 1F968B3903D886E7
-gpg -a --export 1F968B3903D886E7 | sudo apt-key add -
+apt-key advanced --keyserver pgp.net.nz --recv-keys 03D886E7
 
 sudo apt-get update
+apt-get install openjdk-7-jre-headless # java 7 is sufficient, only a headless version is needed
 sudo apt-get install yacy -y -qq
 
-# Modify Nginx and YaCy configuration file, then copy them to the right place
-sed -i "s@PATHTOCHANGE@$path@g" ../conf/nginx.conf
-sudo cp ../conf/nginx.conf /etc/nginx/conf.d/$domain.d/yacy.conf
 
-# Add YaCy service to the YunoHost monitoring
-sudo yunohost service add yacy --log /var/log/yacy/yacy00.log
+#=================================================
+# INSTALL DEPENDENCIES
+#=================================================
 
-#Relancer le service YaCy avec la nouvelle configuration
-sudo yunohost service stop yacy
-sudo yunohost service start yacy
+#ynh_print_info "Installing dependencies and pip packages"
+#ynh_install_app_dependencies $PKG_DEPENDENCIES
+#pip install --target $final_path/vendor -r $final_path/requirements.txt
 
-# Reload Nginx and regenerate SSOwat conf
-sudo service nginx reload
-sudo yunohost app ssowatconf
+#=================================================
+# NGINX CONFIGURATION
+#=================================================
+#Cannot use empty string for X-script-name, causes an issue in the python prg
+if [ $path_url = "/" ] ; then
+	ynh_replace_string "        proxy_set_header		X-Script-Name" "#       proxy_set_header		X-Script-Name" ../conf/nginx.conf
+fi
+
+# Create a dedicated nginx config
+ynh_add_nginx_config
+
+#=================================================
+# CREATE DEDICATED USER
+#=================================================
+## Seems redundant, yacy will run as root I presume
+# Create a system user
+#ynh_system_user_create $app
+
+#chown -R $app: $final_path
+
+#=================================================
+# SETUP SYSTEMD
+#=================================================
+
+# Create a dedicated systemd config
+ynh_add_systemd_config
+
+#=================================================
+# CREATE FILES AND DIRECTORIES
+#=================================================
+ynh_print_info "Creating files and directory"
+#Logic is as follow : if app is set to be publicly accessible, we will assume that the library should be set in "Share" multimedia directory
+# If app is set to be private but access is requested for all user, we will assume the same
+# If app is set to be private but access is limited to the admin user, we will set it inside his own multimedia directory.
+# Access to the app is managed in the SSOwat part of the script.
+
+#build multimedia directory
+#ynh_multimedia_build_main_dir
+#ynh_multimedia_addaccess $app
+
+
+#=================================================
+# SETUP LOGROTATE
+#=================================================
+
+# Use logrotate to manage application logfile(s)
+ynh_use_logrotate
+#chown -R $app:$app /var/log/$app
+
+#=================================================
+# SPECIFIC SETUP
+#=================================================
+# SET SQLITE DATABASE SETTINGS
+#=================================================
+
+ynh_print_info "Setting up database and settings"
+#we need to start and stop the service so that initial app.db file is created and that we can set default data
+ynh_systemd_action -l "INFO in server: Starting Gevent server"
+
+#sleep required on low spec like raspberryPi
+sleep 2s
+ynh_systemd_action -a stop
+
+
+#=================================================
+# SECURE FILES AND DIRECTORIES
+#=================================================
+
+# Set permissions to app files
+#disabled - do not work when calibreweb is not owner
+#chown -R root: $final_path
+#chown $app: $final_path/app.db
+
+
+#=================================================
+# STORE THE CHECKSUM OF THE CONFIG FILE
+#=================================================
+
+# Calculate and store the config file checksum into the app settings
+ynh_store_file_checksum "${final_path}/app.db"
+
+#=================================================
+# ADVERTISE SERVICE IN ADMIN PANEL
+#=================================================
+
+yunohost service add $app --log "/var/log/$app/$app.log"
+
+#=================================================
+# SETUP SSOWAT
+#=================================================
+
+# Make app public if necessary
+if [ $is_public -eq 1 ]
+then
+	# unprotected_uris allows SSO credentials to be passed anyway.
+	ynh_app_setting_set $app unprotected_uris "/"
+fi
+if [ $public_library -eq 0 ]; then
+	yunohost app addaccess $app -u $admin
+fi
+
+
+
+#=================================================
+# RELOAD NGINX
+#=================================================
+ynh_print_info "Reload nginx and start $app"
+systemctl reload nginx
+ynh_systemd_action -l "INFO in server: Starting Gevent server"
