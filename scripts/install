@@ -74,7 +74,7 @@ echo "deb http://debian.yacy.net ./" | sudo tee /etc/apt/sources.list.d/yacy.lis
 ##wget http://debian.yacy.net/yacy_orbiter_key.asc -O- | apt-key add - # Certificates all outdated ;(
 
 sudo apt-get --allow-unauthenticated update
-sudo export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get install -y -qq openjdk-8-jre-headless ca-certificates-java java-common libnspr4 libnss3 # java 8 is sufficient, only a headless version is needed
 sudo apt-get install yacy -y -qq --allow-unauthenticated
 
