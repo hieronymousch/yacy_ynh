@@ -71,11 +71,11 @@ ynh_app_setting_set $app port $port
 
 # Install Debian official package
 echo "deb http://debian.yacy.net ./" | sudo tee /etc/apt/sources.list.d/yacy.list
-wget http://debian.yacy.net/yacy_orbiter_key.asc -O- | apt-key add -
+##wget http://debian.yacy.net/yacy_orbiter_key.asc -O- | apt-key add - # Certificates all outdated ;(
 
 sudo apt-get update
-#apt-get install openjdk-7-jre-headless # java 7 is sufficient, only a headless version is needed
-sudo apt-get install yacy -y -qq
+sudo apt install openjdk-8-jre-headless # java 8 is sufficient, only a headless version is needed
+sudo apt install yacy -y -qq --allow-unauthenticated
 
 
 #=================================================
