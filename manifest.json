@@ -5,16 +5,23 @@
         "en": "Free and decentrelized search engine",
         "fr": "Moteur de recherche libre et décentralisé"
     },
+    "version": "1.922.9964~ynh",
+    "url": "https://github.com/yacy/yacy_search_server",
+    "license": "free",
     "developer": {
         "name": "Moul",
         "email": "moul@moul.re",
         "url": "yunohost.org"
     },
     "multi_instance": "true",
+    "services": [
+        "nginx"
+    ],
     "arguments": {
         "install" : [
             {
                 "name": "domain",
+                "type": "domain",
                 "ask": {
                     "en": "Choose a domain for YaCy",
                     "fr": "Choisisez un nom de domaine sur lequel installer YaCy"
@@ -23,6 +30,7 @@
             },
             {
                 "name": "path",
+                "type": "path",
                 "ask": {
                     "en": "Choose a path for YaCy",
                     "fr": "Choisisez une adresse sur laquelle installer YaCy"
