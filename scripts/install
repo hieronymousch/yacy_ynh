@@ -19,8 +19,9 @@ fi
 # Install Debian official package
 echo "deb http://debian.yacy.net ./" | sudo tee /etc/apt/sources.list.d/yacy.list
 
-gpg --keyserver pgpkeys.mit.edu --recv-key 1F968B3903D886E7
-gpg -a --export 1F968B3903D886E7 | sudo apt-key add -
+#gpg --keyserver pgpkeys.mit.edu --recv-key 1F968B3903D886E7
+#gpg -a --export 1F968B3903D886E7 | sudo apt-key add -
+apt-key advanced --keyserver pgp.net.nz --recv-keys 03D886E7
 
 sudo apt-get update
 sudo apt-get install yacy -y -qq
