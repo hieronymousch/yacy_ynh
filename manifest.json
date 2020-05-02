@@ -13,7 +13,7 @@
         "email": "moul@moul.re",
         "url": "yunohost.org"
     },
-    requirements": {
+    "requirements": {
         "yunohost": ">= 3.0.0"
     },
     "multi_instance": "true",
