@@ -1,11 +1,103 @@
 #!/bin/bash
 
+#=================================================
+# GENERIC START
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source /usr/share/yunohost/helpers
+
+#=================================================
+# LOAD SETTINGS
+#=================================================
+
+app=$YNH_APP_INSTANCE_NAME
+domain=$(ynh_app_setting_get $app domain)
+port=$(ynh_app_setting_get $app port)
+
+#=================================================
+# REMOVE SERVICE FROM ADMIN PANEL
+#=================================================
+
+# Remove a service from the admin panel, added by `yunohost service add`
+if yunohost service status | grep -q $app
+then
+	echo "Remove $app service"
+	yunohost service remove $app
+fi
+
+#=================================================
+# STANDARD REMOVE
+#=================================================
+# STOP AND REMOVE SERVICE
+#=================================================
+
+# Remove the dedicated systemd config
+ynh_print_info "Removing systemd"
+ynh_remove_systemd_config
+
 # Remove Debian official
 sudo apt-get remove yacy -y -qq
 
-# Remove YaCy service to YunoHost monitoring
-sudo yunohost service remove yacy
 
-#Reload Nginx and regenerate SSOwat conf
-sudo service nginx reload
-sudo yunohost app ssowatconf
+#=================================================
+# REMOVE DEPENDENCIES
+#=================================================
+
+
+
+#=================================================
+# REMOVE APP MAIN DIR
+#=================================================
+
+# Remove the app directory securely
+
+
+#=================================================
+# REMOVE NGINX CONFIGURATION
+#=================================================
+
+# Remove the dedicated nginx config
+ynh_print_info "Removing nginx config"
+ynh_remove_nginx_config
+
+#=================================================
+# REMOVE LOGROTATE CONFIGURATION
+#=================================================
+
+# Remove the app-specific logrotate config
+ynh_remove_logrotate
+
+#=================================================
+# CLOSE A PORT
+#=================================================
+
+if yunohost firewall list | grep -q "\- $port$"
+then
+	ynh_print_info "Removing open port $port"
+	echo "Close port $port" >&2
+	yunohost firewall disallow TCP $port 2>&1
+fi
+
+#=================================================
+# SPECIFIC REMOVE
+#=================================================
+
+# Remove the log files
+ynh_secure_remove "/var/log/$app/"
+
+#=================================================
+# GENERIC FINALIZATION
+#=================================================
+# REMOVE DEDICATED USER
+#=================================================
+
+# Delete a system user
+ynh_system_user_delete $app
+
+#=================================================
+# MESSAGE TO USER
+#=================================================
+
+ynh_print_warn "!!!The data folder is not removed, remove manually at /var/lib/yacy!!!"
